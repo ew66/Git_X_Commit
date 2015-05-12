@@ -1,0 +1,326 @@
+#!/usr/bin/python
+
+import sys
+import time
+import datetime
+from subprocess import call, Popen, PIPE
+import argparse
+import collections
+from itertools import groupby
+from operator import itemgetter
+
+#***********#
+# Functions #
+#***********#
+
+class GitXCommit:
+	def __init__(self):
+		self.commit_msg = collections.OrderedDict([ ('Jira ID' 			, ""),
+													('Title'   			, ""),
+													('Team'	  			, ""),
+													('Change' 			, ""),
+						    						('Symptom' 			, ""),
+													('Cause'   			, ""),
+													('Solution'			, ""),
+													('Related IssueKeys', ""),
+													('Chipset' 			, "") ])
+		self.git_path = "./.git"
+		self.commit_msg_str = ""
+		self.commit_comment_start = ""
+		self.commit_comment_end = ""
+		self.rd_name = "FIH"
+
+#		self.set_functions = { 	'jira_id' 			: set_jira_id,
+#								'title'   			: set_title,
+#								'team'	  			: set_team,
+#								'change' 			: set_change,
+#						    	'symptom' 			: set_symptom,
+#								'cause'   			: set_cause,
+#								'solution'			: set_solution,
+#								'related_issuekeys'	: set_related_issuekeys,
+#								'chipset' 			: set_chipset }
+						
+# parse "git ls-files -status" 
+	def get_git_ls_files(self, status):
+		git_files, err = Popen(["git", "ls-files", status], stdout=PIPE).communicate()
+		return git_files.strip('\n')
+
+	# return "git diff --cached --name-only"
+	def get_git_staged_files(self):
+		git_files, err = Popen(["git", "diff", "--cached", "--name-only"], stdout=PIPE).communicate()
+		return git_files.strip('\n')
+
+	def set_msg(self, item, msg):
+		self.commit_msg[item] = msg
+		
+	def get_msg(self, item):
+		return self.commit_msg[item]
+
+	def set_rd_name(self, name):
+		self.rd_name = name
+
+	def get_rd_name(self):
+		return self.rd_name
+
+	def init_interactive(self,length):
+#		print self.commit_msg.keys()
+		for key in self.commit_msg.keys()[:length]:
+			print "[" + key + "][" + self.get_msg(key) + "]: "
+			# input several lines and quit while loop with a new line
+			run = True
+			msg = ""
+			while run:
+				line = sys.stdin.readline()#.rstrip('\n')
+				msg+=line
+				if line == '\n':
+					run = False
+				#print msg
+			if msg != '\n':
+				self.set_msg(key, msg.rstrip('\n'))
+#			print self.get_msg(key)
+#			print ""
+
+	def get_commit_msg(self):
+		self.commit_msg_str = ""
+		for key in self.commit_msg.keys():
+			if key == "Jira ID":
+				self.commit_msg_str = self.commit_msg_str + "[" + self.get_msg(key) + "]:"
+			elif key == "Title":
+				self.commit_msg_str = self.commit_msg_str + self.get_msg(key) + '\n\n'
+			else:
+#			print "[" + key + "]: \n" + self.get_msg(key) + '\n',
+				self.commit_msg_str = self.commit_msg_str + "[" + key + "]: \n" + self.get_msg(key) + '\n'
+#		self.commit_msg_str = self.commit_msg_str + "\""
+		return self.commit_msg_str
+
+	def show_commit_comment(self):
+#		RD_name = "edgarcywang"
+	        self.commit_comment_start = "/* VERTU - " + self.rd_name + " - " + self.commit_msg['Jira ID'] + " - " + self.commit_msg['Title'] + " */"
+		self.commit_comment_end = "/* end - VERTU - " + self.commit_msg['Jira ID'] + " */"
+		print self.commit_comment_start
+		print self.commit_comment_end
+
+	# init default commit message
+	def init_from_last_commit(self):
+		# get from last commit
+		self.get_from_last_commit()
+		# get git changed files and input to commit message
+		#self.set_msg("Change", self.get_git_ls_files("-m"))
+		self.set_msg("Change", self.get_git_staged_files())
+		# init commit_msg
+		self.get_commit_msg()
+		print "init_from_last_commit"
+
+	# get all last commit message
+	def get_from_last_commit(self):
+		file_path = self.get_git_root_path() + "/.git/COMMIT_EDITMSG"
+		ofile = open(file_path, 'r');
+		ofile_msg = []
+	#	print ofile.readlines()
+		# read from file_path
+		for line in ofile:
+			if line != '\n':
+				ofile_msg.append(line.strip('\n'))
+	#	ofile_msg = ofile.readlines()
+		# parse jira-id and title
+		temp = ofile_msg[0].split(':')
+		self.set_msg('Jira ID', temp[0].strip('[]'))
+		self.set_msg('Title',temp[1])
+		ofile_msg.remove(ofile_msg[0])
+	#	print ofile_msg
+		# parse other keys in last_commit
+		for line in ofile_msg:
+			for key in self.commit_msg.keys():
+				if '['+key+']' in line:
+	#				print line.rstrip('\n')
+					self.set_msg(key, ofile_msg[ofile_msg.index(line)+1])
+			
+	def git_xcommit(self):
+		#git commit -m "....."
+		call(["git", "commit", "-m", self.get_commit_msg()])
+
+	def get_git_root_path(self):
+		path, err = Popen(["git", "rev-parse", "--show-toplevel"], stdout=PIPE).communicate()
+		return path.strip('\n')
+	
+	def set_git_root_path(self, path):
+		self.git_path = path;
+	
+        def parse_diff_line_num(self):
+            files = self.get_git_ls_files("-m")
+            #print files
+	    file_list = []
+	    comment_file_list = []
+	    i = 0
+	    for f in files.split():
+	        print str(i) + ".)" + f
+	    	file_list.append(f)
+	    	i = i + 1
+
+            lines = []
+            ##################
+	    
+	    while True:
+	        i = 0
+	        print "==================="
+                print "targeted file list:"
+	        print "==================="
+                for f in comment_file_list:
+	            print str(i) + ".)" + f
+	            i = i + 1
+	        print ""
+
+	        i = 0
+	        print "==================="
+                print "modified file list:"
+	        print "==================="
+	   	for f in file_list:
+	            print str(i) + ".)" + f
+	            i = i + 1
+                    
+	        print ""
+	   	print "choose 1 file to git add (0~" + str(len(file_list)-1) + "),or enter q to exit, a for all files, r for ready!: "
+	   	line = sys.stdin.readline().rstrip('\n')
+	   	try: 
+	   		int(line)
+	   	except ValueError:
+	   		if line.lower() == 'q':
+	   		        return
+	   		elif line.lower() == 'a':
+	   		        comment_file_list.extend(file_list)
+	   		        break
+	   		elif line.lower() == 'r':
+	   		        break
+	   		print "index must be a number."
+	   		continue
+	   	if int(line) < len(file_list):
+	   		print "add " + file_list[int(line)] + "to comment_file_list."
+	   		comment_file_list.append(file_list[int(line)])
+	   		file_list.remove(file_list[int(line)])
+	   	else:
+	   		print "enter wrong index."
+            ##################
+            for f in comment_file_list:
+                shift_count = 0
+                #get diff line's number
+                #print f
+                p1 = Popen(["git", "blame", "-n", f], stdout=PIPE)
+                p2 = Popen(["grep", "Not Committed Yet"], stdin=p1.stdout, stdout=PIPE)
+                p1.stdout.close()
+                line, err = Popen(["awk", "{print $2}"], stdin=p2.stdout, stdout=PIPE).communicate()
+                p2.stdout.close()
+                numbers = [int(i) for i in line.split()]
+                for k, g in groupby(enumerate(numbers), lambda (i,x):i-x):
+                    number_block = map(itemgetter(1), g)
+                    start_pos = number_block[0]
+                    end_pos = number_block[-1]
+                    if len(number_block) == 0:
+                        print "error, no number_block"
+
+                    comment_start = str(start_pos+shift_count) + "i" + self.commit_comment_start
+                    call(["sed", "-i", comment_start, f])
+                    shift_count = shift_count + 1
+                    comment_end = str(end_pos+shift_count+1) + "i" + self.commit_comment_end
+                    call(["sed", "-i", comment_end, f])
+                    shift_count = shift_count + 1
+
+                
+	
+	def git_xcommit_add(self):
+		is_add_all = False
+		files = self.get_git_ls_files("-m")
+		print files
+		print "add all files?(y/n)?: "
+		line = sys.stdin.readline().rstrip('\n')
+		
+		if line.lower() == 'y':
+			print "add all files to git."
+			is_add_all = True
+		else:
+			print "entering interactive mode..."
+		
+		if is_add_all is True:
+			for f in files.split():
+				print "git add " + f + "."
+				call(["git", "add", f])
+		else:
+			while True:
+				files = self.get_git_ls_files("-m")
+				if files == "":
+					break
+				print files
+				i = 0
+				file_list = []
+				for f in files.split():
+					print str(i) + ".)" + f
+					file_list.append(f)
+					i = i + 1
+#				for f in files.split():
+				print "choose 1 file to git add (0~" + str(len(file_list)-1) + "),or enter q to exit: "
+				line = sys.stdin.readline().rstrip('\n')
+				try: 
+					int(line)
+				except ValueError:
+					if line.lower() == 'q':
+						break;
+					print "index must be a number."
+					continue
+				if int(line) < len(file_list):
+					print "git add " + file_list[int(line)] + "."
+					call(["git", "add", file_list[int(line)]])
+				else:
+					print "enter wrong index."
+		
+# 1. I need parse arguments:
+#	-i: interactive commit message
+#	-c: comment in code
+parser = argparse.ArgumentParser(description='Git X Commit - A interactive git-commit')
+#parser.add_argument('integers', metavar='N', type=int, nargs='+', help='an integer for the accumulator')
+parser.add_argument('-i', dest='flag_i', required=False, action='store_true', help='enter interactive git-commit dialog')
+parser.add_argument('-c', dest='flag_c', required=False, action='store_true', help='generate a comment to mark the code')
+parser.add_argument('-add', dest='flag_add', required=False, action='store_true', help='add modified files to stage')
+#parser.add_argument('--sum', dest='accumulate', action='store_const', const=sum, default=max, help='sum the integers (default: find the max)')
+
+args = parser.parse_args()
+#print(args.accumulate(args.integers))
+
+
+# main function
+if __name__ == '__main__':
+	gxc = GitXCommit()
+	
+	# flag interactive mode
+	if args.flag_i :
+		# get last commit message
+		gxc.init_from_last_commit()
+		# enter interactive mode
+		gxc.init_interactive(9)
+		# show commit message
+		print gxc.get_commit_msg()
+		# git commit
+		gxc.git_xcommit()
+
+	# flag generate commmand
+	elif args.flag_c :
+		# get last commit message
+#		gxc.get_from_last_commit()
+		# enter interactive mode
+		gxc.init_interactive(2)
+		# set RD name
+		print "[RD name]" + "[" + gxc.get_rd_name() + "]: "
+		line = sys.stdin.readline()#.rstrip('\n')
+		gxc.set_rd_name(line.rstrip('\n'))
+		# print commend
+		gxc.show_commit_comment()
+	        # insert comment into files which are changed
+	        gxc.parse_diff_line_num()
+	        
+	# flag add modilied files
+	elif args.flag_add :
+		gxc.git_xcommit_add()
+	else:
+		parser.print_help()
+#	gxc.git_xcommit()
+#	gxc.init_interactive()
+#	gxc.init_interactive()
+#	gxc.show_commit_msg()
