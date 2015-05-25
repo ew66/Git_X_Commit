@@ -204,12 +204,17 @@ class GitXCommit:
                 shift_count = 0
                 #get diff line's number
                 #print f
-                p1 = Popen(["git", "blame", "-n","-b", f], stdout=PIPE)
+                p1 = Popen(["git", "blame", "-c" ,"-n","-b", f], stdout=PIPE)
                 p2 = Popen(["grep", "Not Committed Yet"], stdin=p1.stdout, stdout=PIPE)
                 p1.stdout.close()
-                line, err = Popen(["awk", "{print $3}"], stdin=p2.stdout, stdout=PIPE).communicate()
+                line, err = Popen(["awk", "{print $8}"], stdin=p2.stdout, stdout=PIPE).communicate()
                 p2.stdout.close()
-                numbers = [int(i) for i in line.split()]
+                numbers = [int(i.split(')')[0]) for i in line.split()]
+                print numbers
+                #for i in line.split():
+                #    print i.split(')')[0]
+                #    #int(i)
+                #exit();
                 for k, g in groupby(enumerate(numbers), lambda (i,x):i-x):
                     number_block = map(itemgetter(1), g)
                     start_pos = number_block[0]
