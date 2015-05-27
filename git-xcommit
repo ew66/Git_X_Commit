@@ -229,7 +229,12 @@ class GitXCommit:
                     call(["sed", "-i", comment_end, f])
                     shift_count = shift_count + 1
 
-                
+        def git_xcommit_backup(self):
+		files = self.get_git_ls_files("-m")
+                for f in files.split():
+		    back_f = f + ".backup"
+		    print "cp " + f + " to " + back_f
+                    call(["cp", "-p", f, back_f])
 	
 	def git_xcommit_add(self):
 		is_add_all = False
@@ -284,6 +289,7 @@ parser = argparse.ArgumentParser(description='Git X Commit - A interactive git-c
 parser.add_argument('-i', dest='flag_i', required=False, action='store_true', help='enter interactive git-commit dialog')
 parser.add_argument('-c', dest='flag_c', required=False, action='store_true', help='generate a comment to mark the code')
 parser.add_argument('-add', dest='flag_add', required=False, action='store_true', help='add modified files to stage')
+parser.add_argument('-backup', dest='flag_backup', required=False, action='store_true', help='backup all changes files')
 #parser.add_argument('--sum', dest='accumulate', action='store_const', const=sum, default=max, help='sum the integers (default: find the max)')
 
 args = parser.parse_args()
@@ -320,9 +326,13 @@ if __name__ == '__main__':
 	        # insert comment into files which are changed
 	        gxc.parse_diff_line_num()
 	        
-	# flag add modilied files
+	# flag add modified files
 	elif args.flag_add :
 		gxc.git_xcommit_add()
+
+	# flag backup modified files
+	elif args.flag_backup :
+		gxc.git_xcommit_backup()
 	else:
 		parser.print_help()
 #	gxc.git_xcommit()
