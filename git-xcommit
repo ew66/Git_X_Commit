@@ -8,6 +8,8 @@ import argparse
 import collections
 from itertools import groupby
 from operator import itemgetter
+import os
+from shutil import copyfile
 
 #***********#
 # Functions #
@@ -15,40 +17,48 @@ from operator import itemgetter
 
 class GitXCommit:
 	def __init__(self):
-		self.commit_msg = collections.OrderedDict([ ('Jira ID' 			, ""),
-													('Title'   			, ""),
-													('Team'	  			, ""),
-													('Change' 			, ""),
-						    						('Symptom' 			, ""),
-													('Cause'   			, ""),
-													('Solution'			, ""),
-													('Related IssueKeys', ""),
-													('Chipset' 			, "") ])
-		self.git_path = "./.git"
-		self.commit_msg_str = ""
-		self.commit_comment_start = ""
-		self.commit_comment_end = ""
-		self.rd_name = "FIH"
+	    self.commit_msg = collections.OrderedDict([ ('Jira ID'          , ""),
+			                                ('Title'            , ""),
+							('Team'	            , ""),
+						        ('Change'           , ""),
+						    	('Symptom'          , ""),
+							('Cause'            , ""),
+							('Solution'         , ""),
+							('Related IssueKeys', ""),
+							('Chipset'          , "") ])
+	    self.git_path = "./.git"
+	    self.commit_msg_str = ""
+	    self.commit_comment_start = ""
+	    self.commit_comment_end = ""
+	    self.rd_name = "FIH"
 
-#		self.set_functions = { 	'jira_id' 			: set_jira_id,
-#								'title'   			: set_title,
-#								'team'	  			: set_team,
-#								'change' 			: set_change,
-#						    	'symptom' 			: set_symptom,
-#								'cause'   			: set_cause,
-#								'solution'			: set_solution,
-#								'related_issuekeys'	: set_related_issuekeys,
-#								'chipset' 			: set_chipset }
+#		self.set_functions = { 	'jira_id' 	        : set_jira_id,
+#	                		'title'   	        : set_title,
+#	                		'team'	  	        : set_team,
+#	                		'change'  	        : set_change,
+#	                    	        'symptom' 	        : set_symptom,
+#	                		'cause'   	        : set_cause,
+#	                		'solution'	        : set_solution,
+#	                		'related_issuekeys'	: set_related_issuekeys,
+#	                		'chipset' 		: set_chipset }
 						
-# parse "git ls-files -status" 
+        # parse "git ls-files -status" and return the path of changed files list, root path is current folder
 	def get_git_ls_files(self, status):
 		git_files, err = Popen(["git", "ls-files", status], stdout=PIPE).communicate()
 		return git_files.strip('\n')
 
 	# return "git diff --cached --name-only"
 	def get_git_staged_files(self):
-		git_files, err = Popen(["git", "diff", "--cached", "--name-only"], stdout=PIPE).communicate()
-		return git_files.strip('\n')
+	        git_files = self.get_git_changed_files("--cached")
+		return git_files
+        
+        # return the path of changed files list, root path is git path
+        def get_git_changed_files(self, other_cmd):
+                git_cmd = ["git", "diff", "--name-only"]
+	        if other_cmd != "":
+	            git_cmd.append(other_cmd)
+        	git_files, err = Popen(git_cmd, stdout=PIPE).communicate()
+        	return git_files.strip('\n')
 
 	def set_msg(self, item, msg):
 		self.commit_msg[item] = msg
@@ -60,6 +70,10 @@ class GitXCommit:
 		self.rd_name = name
 
 	def get_rd_name(self):
+                file_path = self.get_temp_path() + "/RD_NAME"
+                if os.path.isfile(file_path) is True:
+        	    ofile = open(file_path, 'r');
+	            self.rd_name = ofile.read().strip('\n')
 		return self.rd_name
 
 	def init_interactive(self,length):
@@ -113,8 +127,16 @@ class GitXCommit:
 
 	# get all last commit message
 	def get_from_last_commit(self):
-		file_path = self.get_git_root_path() + "/.git/COMMIT_EDITMSG"
-		ofile = open(file_path, 'r');
+                file_path = self.get_temp_path() + "/COMMIT_EDITMSG"
+                if os.path.isfile(file_path) is True:
+        	    ofile = open(file_path, 'r');
+                else:
+		    file_path = self.get_git_root_path() + "/.git/COMMIT_EDITMSG"
+		    ofile = open(file_path, 'r');
+
+                if ofile is None:
+                    print "Can not read COMMIT_EDITMSG"
+                    exit()
 		ofile_msg = []
 	#	print ofile.readlines()
 		# read from file_path
@@ -145,6 +167,22 @@ class GitXCommit:
 	
 	def set_git_root_path(self, path):
 		self.git_path = path;
+
+	def set_temp_path(self):
+                if os.uname()[0] == "Windows":
+                    self.temp_path = os.path.expanduser('~')
+                elif os.uname()[0] == "Darwin":
+                    self.temp_path = "/tmp"
+                else:
+                    self.temp_path = "/tmp"
+
+        def get_temp_path(self):
+                return self.temp_path
+
+        def copy_commit_msg_to_tmp(self):
+		file_path = self.get_git_root_path() + "/.git/COMMIT_EDITMSG"
+                tmp_path = self.get_temp_path() + "/COMMIT_EDITMSG"
+                copyfile(file_path, tmp_path)
 	
         def parse_diff_line_num(self):
             files = self.get_git_ls_files("-m")
@@ -230,11 +268,26 @@ class GitXCommit:
                     shift_count = shift_count + 1
 
         def git_xcommit_backup(self):
-		files = self.get_git_ls_files("-m")
+		files = self.get_git_changed_files("")
+		root_path = self.get_git_root_path();
+		backup_path = root_path + '/' + 'backup'
                 for f in files.split():
-		    back_f = f + ".backup"
-		    print "cp " + f + " to " + back_f
-                    call(["cp", "-p", f, back_f])
+                        file_path = f.split('/')
+                        full_f_path = root_path
+                        backup_f_path = backup_path
+                        # 1. Create backup folder
+                        for d in file_path[:len(file_path)-1]:
+                                full_f_path = full_f_path + '/' + d
+                                backup_f_path = backup_f_path + '/' + d
+                                if not os.path.exists(backup_f_path):
+                                        os.makedirs(backup_f_path)
+
+                        # 2. Copy changed files to backup folder
+                        backup_f_path = backup_f_path + '/' + file_path[-1]
+                        full_f_path = full_f_path + '/' + file_path[-1]
+                        print "cp " + full_f_path + " to " + backup_f_path
+                        call(["cp", "-p", full_f_path, backup_f_path])
+
 	
 	def git_xcommit_add(self):
 		is_add_all = False
@@ -258,7 +311,7 @@ class GitXCommit:
 				files = self.get_git_ls_files("-m")
 				if files == "":
 					break
-				print files
+#				print files
 				i = 0
 				file_list = []
 				for f in files.split():
@@ -299,6 +352,7 @@ args = parser.parse_args()
 # main function
 if __name__ == '__main__':
 	gxc = GitXCommit()
+	gxc.set_temp_path()
 	
 	# flag interactive mode
 	if args.flag_i :
@@ -310,17 +364,21 @@ if __name__ == '__main__':
 		print gxc.get_commit_msg()
 		# git commit
 		gxc.git_xcommit()
+		# copy COMMIT_MSG to tmp folder
+		gxc.copy_commit_msg_to_tmp()
 
 	# flag generate commmand
 	elif args.flag_c :
 		# get last commit message
-#		gxc.get_from_last_commit()
+		gxc.get_from_last_commit()
 		# enter interactive mode
 		gxc.init_interactive(2)
-		# set RD name
-		print "[RD name]" + "[" + gxc.get_rd_name() + "]: "
-		line = sys.stdin.readline()#.rstrip('\n')
-		gxc.set_rd_name(line.rstrip('\n'))
+		# get RD name
+                if gxc.get_rd_name() == "FIH":
+    		    # if name is default, set RD name
+		    print "[RD name]" + "[" + gxc.get_rd_name() + "]: "
+		    line = sys.stdin.readline()#.rstrip('\n')
+		    gxc.set_rd_name(line.rstrip('\n'))
 		# print commend
 		gxc.show_commit_comment()
 	        # insert comment into files which are changed
