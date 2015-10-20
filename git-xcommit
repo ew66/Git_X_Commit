@@ -299,7 +299,7 @@ class GitXCommit:
                         print "cp " + full_f_path + " to " + backup_new_f_path
                         call(["cp", "-p", full_f_path, backup_new_f_path])
 
-		# 3. Generate changed files list
+		# 3. Generate changed files list and git diff
                 file_path = backup_path + '/' + 'backup_files'
                 ofile = open(file_path, 'w');
                 if ofile is None:
@@ -307,6 +307,14 @@ class GitXCommit:
                 else:
                     ofile.write(files)
                     ofile.close()
+
+                diff_path = backup_path + '/' + 'git.diff'
+                diff_file = open(diff_path, "w")
+                if diff_file is None:
+                    print "Can not dump git diff"
+                else:
+                    call(["git", "diff"], stdout=diff_file)
+                    diff_file.close()
 
                 # stash files
                 print "git stash!"
