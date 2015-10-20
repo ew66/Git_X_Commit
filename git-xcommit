@@ -74,6 +74,7 @@ class GitXCommit:
                 if os.path.isfile(file_path) is True:
         	    ofile = open(file_path, 'r');
 	            self.rd_name = ofile.read().strip('\n')
+	            ofile.close()
 		return self.rd_name
 
 	def init_interactive(self,length):
@@ -156,6 +157,7 @@ class GitXCommit:
 				if '['+key+']' in line:
 	#				print line.rstrip('\n')
 					self.set_msg(key, ofile_msg[ofile_msg.index(line)+1])
+		ofile.close()
 			
 	def git_xcommit(self):
 		#git commit -m "....."
@@ -268,26 +270,57 @@ class GitXCommit:
                     shift_count = shift_count + 1
 
         def git_xcommit_backup(self):
-		files = self.get_git_changed_files("")
+                files = self.get_git_changed_files("")
 		root_path = self.get_git_root_path();
-		backup_path = root_path + '/' + 'backup'
+		backup_path = root_path + '/' + 'backup_' + time.strftime('%Y%m%d%H%M%S')
+		backup_new_path = backup_path + '/' + 'new'
+		backup_old_path = backup_path + '/' + 'old'
+
+                # backup changed files
                 for f in files.split():
                         file_path = f.split('/')
                         full_f_path = root_path
-                        backup_f_path = backup_path
+                        backup_new_f_path = backup_new_path
+                        backup_old_f_path = backup_old_path
                         # 1. Create backup folder
                         for d in file_path[:len(file_path)-1]:
                                 full_f_path = full_f_path + '/' + d
-                                backup_f_path = backup_f_path + '/' + d
-                                if not os.path.exists(backup_f_path):
-                                        os.makedirs(backup_f_path)
+                                backup_new_f_path = backup_new_f_path + '/' + d
+                                backup_old_f_path = backup_old_f_path + '/' + d
+                                if not os.path.exists(backup_new_f_path):
+                                        os.makedirs(backup_new_f_path)
+                                if not os.path.exists(backup_old_f_path):
+                                        os.makedirs(backup_old_f_path)
 
                         # 2. Copy changed files to backup folder
-                        backup_f_path = backup_f_path + '/' + file_path[-1]
+                        backup_new_f_path = backup_new_f_path + '/' + file_path[-1]
                         full_f_path = full_f_path + '/' + file_path[-1]
-                        print "cp " + full_f_path + " to " + backup_f_path
-                        call(["cp", "-p", full_f_path, backup_f_path])
 
+                        print "cp " + full_f_path + " to " + backup_new_f_path
+                        call(["cp", "-p", full_f_path, backup_new_f_path])
+
+		# 3. Generate changed files list
+                file_path = backup_path + '/' + 'backup_files'
+                ofile = open(file_path, 'w');
+                if ofile is None:
+                    print "Can not open file " + file_path
+                else:
+                    ofile.write(files)
+                    ofile.close()
+
+                # stash files
+                print "git stash!"
+                call(["git", "stash"])
+
+                # backup old files
+                for f in files.split():
+                    full_f_path = root_path + '/' + f
+                    backup_old_f_path = backup_old_path + '/' + f
+                    call(["cp", "-p", full_f_path, backup_old_f_path])
+
+                # stash pop
+                print "git stash pop!"
+                call(["git", "stash", "pop"])
 	
 	def git_xcommit_add(self):
 		is_add_all = False
