@@ -139,8 +139,9 @@ class GitXCommit:
 		        ofile = open(file_path, 'r');
 
                 if ofile is None:
-                    print "Can not read COMMIT_EDITMSG"
-                    exit()
+                    print "Can not read COMMIT_EDITMSG, initial with dummy values"
+                    self.set_dummy_commit_msg();
+                    return
 		ofile_msg = []
 	#	print ofile.readlines()
 		# read from file_path
@@ -161,7 +162,18 @@ class GitXCommit:
 	#				print line.rstrip('\n')
 					self.set_msg(key, ofile_msg[ofile_msg.index(line)+1])
 		ofile.close()
-			
+
+        def set_dummy_commit_msg(self):
+            self.set_msg('Jira ID', 'XXX-1234')
+            self.set_msg('Title', 'Issue title')
+            self.set_msg('Team', '_R3JD08TXX')
+            self.set_msg('Change', 'xxxx.c')
+            self.set_msg('Symptom', 'e.g. crash')
+            self.set_msg('Cause', 'e.g. memory leak')
+            self.set_msg('Solution', 'e.g. brabra')
+            self.set_msg('Related IssueKeys', 'None')
+            self.set_msg('Chipset', 'MSM8XXX')
+
 	def git_xcommit(self):
 		#git commit -m "....."
 		call(["git", "commit", "-m", self.get_commit_msg()])
