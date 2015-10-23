@@ -10,6 +10,7 @@ from itertools import groupby
 from operator import itemgetter
 import os
 from shutil import copyfile
+import platform
 
 #***********#
 # Functions #
@@ -129,11 +130,13 @@ class GitXCommit:
 	# get all last commit message
 	def get_from_last_commit(self):
                 file_path = self.get_temp_path() + "/COMMIT_EDITMSG"
+                ofile = None
                 if os.path.isfile(file_path) is True:
         	    ofile = open(file_path, 'r');
                 else:
-		    file_path = self.get_git_root_path() + "/.git/COMMIT_EDITMSG"
-		    ofile = open(file_path, 'r');
+                    file_path = self.get_git_root_path() + "/.git/COMMIT_EDITMSG"
+                    if os.path.isfile(file_path) is True:
+		        ofile = open(file_path, 'r');
 
                 if ofile is None:
                     print "Can not read COMMIT_EDITMSG"
@@ -186,6 +189,11 @@ class GitXCommit:
                 tmp_path = self.get_temp_path() + "/COMMIT_EDITMSG"
                 copyfile(file_path, tmp_path)
 	
+        def is_darwin(self):
+            os_uname = platform.uname()[0]
+            if os_uname == "Darwin":
+                return True
+
         def parse_diff_line_num(self):
             files = self.get_git_ls_files("-m")
             #print files
@@ -263,11 +271,13 @@ class GitXCommit:
                         print "error, no number_block"
 
                     comment_start = str(start_pos+shift_count) + "i" + self.commit_comment_start
-                    call(["sed", "-i", comment_start, f])
+                    sed_cmd = "gsed" if self.is_darwin() == True else "sed"
+                    call([sed_cmd, "-i", comment_start, f])
                     shift_count = shift_count + 1
                     comment_end = str(end_pos+shift_count+1) + "i" + self.commit_comment_end
-                    call(["sed", "-i", comment_end, f])
+                    call([sed_cmd, "-i", comment_end, f])
                     shift_count = shift_count + 1
+
 
         def git_xcommit_backup(self):
                 files = self.get_git_changed_files("")
